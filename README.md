@@ -37,3 +37,6 @@ gedownload bestand — geen extra stap nodig, werkt volledig in de browser.
 - Werkt het beste op één repo per auto/gebruiker; bij meerdere gebruikers tegelijk kan de
   laatste opslag de vorige overschrijven (geen samenvoeg-logica).
 - Wil je liever geen token in de browser? Dan is de Excel-versie de veiligere/simpelere keuze.
+
+#### openen app
+om app te openen: https://MitchMolenaar.github.io/auto-onderhoud/
