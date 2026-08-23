@@ -66,6 +66,17 @@
     padding:9px 12px; font-size:.85rem; display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn-export:hover{border-color:var(--accent);}
+  .checkbox-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-top:6px;
+  }
+  .checkbox-item{
+    display:flex; align-items:center; gap:7px; font-size:.85rem; color:var(--text);
+  }
+  .checkbox-item input{width:auto; margin:0; accent-color:var(--accent);}
+  .checkbox-item label{margin:0; color:var(--text); font-size:.85rem; cursor:pointer;}
+  @media (max-width:480px){
+    .checkbox-grid{grid-template-columns:1fr;}
+  }
 </style>
 </head>
 <body>
@@ -78,7 +89,7 @@
     <div class="row">
       <div>
         <label>Datum</label>
-        <input type="date" id="f-datum">
+        <input type="text" id="f-datum" placeholder="dd-mm-jjjj" inputmode="numeric">
       </div>
       <div>
         <label>KM stand</label>
@@ -86,24 +97,8 @@
       </div>
     </div>
 
-    <label>Onderhoud</label>
-    <select id="f-type">
-      <option>Olie verversen</option>
-      <option>APK keuring</option>
-      <option>Banden wisselen (zomer/winter)</option>
-      <option>Bandenspanning check</option>
-      <option>Remmen (blokken/schijven)</option>
-      <option>Distributieriem</option>
-      <option>Accu</option>
-      <option>Ruitenwissers</option>
-      <option>Airco onderhoud</option>
-      <option>Filters (lucht/brandstof/interieur)</option>
-      <option>Koelvloeistof</option>
-      <option>Grote beurt</option>
-      <option>Kleine beurt</option>
-      <option>Reparatie</option>
-      <option>Anders</option>
-    </select>
+    <label>Onderhoud (meerdere mogelijk)</label>
+    <div class="checkbox-grid" id="f-types"></div>
 
     <label>Status</label>
     <div class="toggle" id="f-status">
@@ -155,6 +150,44 @@ const DATA_FILE = "onderhoud.json";
 let sha = null;
 let data = [];
 
+const ONDERHOUD_ITEMS = [
+  "Oliefilter + olie vervangen",
+  "Luchtfilter vervangen",
+  "Interieurfilter vervangen",
+  "Remschijf check",
+  "Accuvloeistof bijvullen",
+  "Bougie vervangen",
+  "Nieuwe banden",
+  "Nieuwe koelvloeistof",
+  "Nieuwe transmissieolie",
+  "APK keuring",
+  "Banden wisselen (zomer/winter)",
+  "Bandenspanning check",
+  "Distributieriem",
+  "Ruitenwissers",
+  "Airco onderhoud",
+  "Grote beurt",
+  "Kleine beurt",
+  "Reparatie",
+  "Anders",
+];
+
+// dd-mm-jjjj <-> yyyy-mm-dd (intern gesorteerd op ISO-formaat)
+function datumNaarIso(ddmmjjjj){
+  const m = ddmmjjjj.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(!m) return null;
+  const [, d, mnd, j] = m;
+  const dd = d.padStart(2, "0");
+  const mm = mnd.padStart(2, "0");
+  if(Number(dd) < 1 || Number(dd) > 31 || Number(mm) < 1 || Number(mm) > 12) return null;
+  return `${j}-${mm}-${dd}`;
+}
+
+function isoNaarDatum(iso){
+  const [j, m, d] = iso.split("-");
+  return `${d}-${m}-${j}`;
+}
+
 function cfg(){
   return {
     owner: localStorage.getItem("gh_owner") || "",
@@ -179,6 +212,14 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cfg-owner").value = c.owner;
   document.getElementById("cfg-repo").value = c.repo;
   document.getElementById("cfg-token").value = c.token;
+
+  const typesWrap = document.getElementById("f-types");
+  typesWrap.innerHTML = ONDERHOUD_ITEMS.map((item, i) => `
+    <div class="checkbox-item">
+      <input type="checkbox" id="type-${i}" value="${item}">
+      <label for="type-${i}">${item}</label>
+    </div>
+  `).join("");
 
   document.getElementById("f-status").addEventListener("click", (e) => {
     if(e.target.tagName === "BUTTON"){
@@ -275,25 +316,37 @@ async function saveData(commitMsg){
 }
 
 function addRow(){
-  const datum = document.getElementById("f-datum").value;
+  const datumRaw = document.getElementById("f-datum").value;
   const km = document.getElementById("f-km").value;
-  const type = document.getElementById("f-type").value;
+  const types = Array.from(document.querySelectorAll("#f-types input:checked")).map(cb => cb.value);
   const status = document.querySelector("#f-status button.active").dataset.val;
   const info = document.getElementById("f-info").value.trim();
+  const statusEl = document.getElementById("status-add");
 
-  if(!datum || !km){
-    setStatus(document.getElementById("status-add"), "Vul minstens datum en km-stand in.", "err");
+  const datum = datumNaarIso(datumRaw);
+  if(!datum){
+    setStatus(statusEl, "Vul de datum in als dd-mm-jjjj, bv. 15-03-2026.", "err");
+    return;
+  }
+  if(!km){
+    setStatus(statusEl, "Vul de km-stand in.", "err");
+    return;
+  }
+  if(!types.length){
+    setStatus(statusEl, "Vink minstens één werkzaamheid aan.", "err");
     return;
   }
 
   data.unshift({
     id: Date.now(),
-    datum, km: Number(km), type, status, info,
+    datum, km: Number(km), types, status, info,
   });
   renderTable();
-  saveData(`Onderhoud toegevoegd: ${type} (${datum})`);
+  saveData(`Onderhoud toegevoegd: ${types.join(", ")} (${datumRaw})`);
 
+  document.getElementById("f-datum").value = "";
   document.getElementById("f-km").value = "";
+  document.querySelectorAll("#f-types input:checked").forEach(cb => cb.checked = false);
   document.getElementById("f-info").value = "";
 }
 
@@ -309,6 +362,12 @@ function chipClass(status){
   return "chip-nee";
 }
 
+function typesVan(r){
+  if(Array.isArray(r.types)) return r.types;
+  if(r.type) return [r.type];
+  return [];
+}
+
 function renderTable(){
   const wrap = document.getElementById("tabel-wrap");
   if(!data.length){
@@ -319,9 +378,9 @@ function renderTable(){
   let html = "<table><thead><tr><th>Datum</th><th>KM</th><th>Onderhoud</th><th>Status</th><th>Info</th><th></th></tr></thead><tbody>";
   for(const r of sorted){
     html += `<tr>
-      <td>${r.datum}</td>
+      <td>${isoNaarDatum(r.datum)}</td>
       <td>${Number(r.km).toLocaleString("nl-NL")}</td>
-      <td>${r.type}</td>
+      <td>${typesVan(r).join(", ")}</td>
       <td><span class="chip ${chipClass(r.status)}">${r.status === "Ja" ? "Uitgevoerd" : r.status}</span></td>
       <td>${r.info ? r.info : "-"}</td>
       <td><button class="del" onclick="verwijder(${r.id})" title="Verwijderen">✕</button></td>
@@ -336,9 +395,9 @@ function exportRows(){
   return [...data]
     .sort((a,b) => (a.datum < b.datum ? 1 : -1))
     .map(r => ({
-      Datum: r.datum,
+      Datum: isoNaarDatum(r.datum),
       "KM stand": Number(r.km),
-      Onderhoud: r.type,
+      Onderhoud: typesVan(r).join(", "),
       Status: r.status === "Ja" ? "Uitgevoerd" : r.status,
       Info: r.info || "",
     }));
