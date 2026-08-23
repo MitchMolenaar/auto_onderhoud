@@ -85,7 +85,7 @@
   <div class="sub">Bijhouden van km-stand, datum en onderhoud &mdash; opgeslagen in dit GitHub-repo.</div>
 
   <div class="card">
-    <h2>Nieuw onderhoud</h2>
+    <h2 id="form-title">Nieuw onderhoud</h2>
     <div class="row">
       <div>
         <label>Datum</label>
@@ -110,6 +110,7 @@
     <textarea id="f-info" placeholder="bv. 5W30, garage X, kosten..."></textarea>
 
     <button class="btn-primary" id="btn-add">+ Toevoegen</button>
+    <button class="btn-secondary" id="btn-cancel-edit" style="width:100%; margin-top:8px; display:none;">Annuleer bewerken</button>
     <div class="status" id="status-add"></div>
   </div>
 
@@ -149,21 +150,29 @@
 const DATA_FILE = "onderhoud.json";
 let sha = null;
 let data = [];
+let editingId = null;
 
 const ONDERHOUD_ITEMS = [
-  "Oliefilter + olie vervangen",
+  // Olie & filters
+  "Olie vervangen",
+  "Oliefilter vervangen",
   "Luchtfilter vervangen",
   "Interieurfilter vervangen",
-  "Remschijf check",
-  "Accuvloeistof bijvullen",
-  "Bougie vervangen",
-  "Nieuwe banden",
+  // Vloeistoffen
   "Nieuwe koelvloeistof",
   "Nieuwe transmissieolie",
-  "APK keuring",
+  "Accuvloeistof bijvullen",
+  // Remmen
+  "Remschijf check",
+  // Banden
+  "Nieuwe banden",
   "Banden wisselen (zomer/winter)",
   "Bandenspanning check",
+  // Motor / ontsteking
+  "Bougie vervangen",
   "Distributieriem",
+  // Overig
+  "APK keuring",
   "Ruitenwissers",
   "Airco onderhoud",
   "Grote beurt",
@@ -230,6 +239,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("btn-save-cfg").addEventListener("click", saveCfg);
   document.getElementById("btn-add").addEventListener("click", addRow);
+  document.getElementById("btn-cancel-edit").addEventListener("click", annuleerBewerken);
   document.getElementById("btn-export-xlsx").addEventListener("click", exportXlsx);
   document.getElementById("btn-export-pdf").addEventListener("click", exportPdf);
 
@@ -337,6 +347,17 @@ function addRow(){
     return;
   }
 
+  if(editingId !== null){
+    const idx = data.findIndex(r => r.id === editingId);
+    if(idx !== -1){
+      data[idx] = { ...data[idx], datum, km: Number(km), types, status, info };
+    }
+    renderTable();
+    saveData(`Onderhoud gewijzigd: ${types.join(", ")} (${datumRaw})`);
+    annuleerBewerken();
+    return;
+  }
+
   data.unshift({
     id: Date.now(),
     datum, km: Number(km), types, status, info,
@@ -350,8 +371,44 @@ function addRow(){
   document.getElementById("f-info").value = "";
 }
 
+function bewerken(id){
+  const r = data.find(row => row.id === id);
+  if(!r) return;
+  editingId = id;
+
+  document.getElementById("f-datum").value = isoNaarDatum(r.datum);
+  document.getElementById("f-km").value = r.km;
+  const types = typesVan(r);
+  document.querySelectorAll("#f-types input").forEach(cb => {
+    cb.checked = types.includes(cb.value);
+  });
+  document.querySelectorAll("#f-status button").forEach(b => {
+    b.classList.toggle("active", b.dataset.val === r.status);
+  });
+  document.getElementById("f-info").value = r.info || "";
+
+  document.getElementById("form-title").textContent = "Onderhoud wijzigen";
+  document.getElementById("btn-add").textContent = "Wijziging opslaan";
+  document.getElementById("btn-cancel-edit").style.display = "block";
+  document.querySelector(".card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function annuleerBewerken(){
+  editingId = null;
+  document.getElementById("f-datum").value = "";
+  document.getElementById("f-km").value = "";
+  document.querySelectorAll("#f-types input:checked").forEach(cb => cb.checked = false);
+  document.querySelectorAll("#f-status button").forEach(b => b.classList.toggle("active", b.dataset.val === "Gepland"));
+  document.getElementById("f-info").value = "";
+  document.getElementById("form-title").textContent = "Nieuw onderhoud";
+  document.getElementById("btn-add").textContent = "+ Toevoegen";
+  document.getElementById("btn-cancel-edit").style.display = "none";
+  setStatus(document.getElementById("status-add"), "", "");
+}
+
 function verwijder(id){
   data = data.filter(r => r.id !== id);
+  if(editingId === id) annuleerBewerken();
   renderTable();
   saveData("Onderhoud verwijderd");
 }
@@ -383,7 +440,10 @@ function renderTable(){
       <td>${typesVan(r).join(", ")}</td>
       <td><span class="chip ${chipClass(r.status)}">${r.status === "Ja" ? "Uitgevoerd" : r.status}</span></td>
       <td>${r.info ? r.info : "-"}</td>
-      <td><button class="del" onclick="verwijder(${r.id})" title="Verwijderen">✕</button></td>
+      <td>
+        <button class="del" onclick="bewerken(${r.id})" title="Wijzigen" style="color:var(--accent);">✎</button>
+        <button class="del" onclick="verwijder(${r.id})" title="Verwijderen">✕</button>
+      </td>
     </tr>`;
   }
   html += "</tbody></table>";
