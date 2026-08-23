@@ -374,7 +374,7 @@ function renderTable(){
     wrap.innerHTML = '<div class="empty">Nog geen onderhoud geregistreerd.</div>';
     return;
   }
-  const sorted = [...data].sort((a,b) => (a.datum < b.datum ? 1 : -1));
+  const sorted = [...data].sort((a,b) => (a.datum < b.datum ? -1 : 1));
   let html = "<table><thead><tr><th>Datum</th><th>KM</th><th>Onderhoud</th><th>Status</th><th>Info</th><th></th></tr></thead><tbody>";
   for(const r of sorted){
     html += `<tr>
@@ -393,7 +393,7 @@ function renderTable(){
 // ---------- Export ----------
 function exportRows(){
   return [...data]
-    .sort((a,b) => (a.datum < b.datum ? 1 : -1))
+    .sort((a,b) => (a.datum < b.datum ? -1 : 1))
     .map(r => ({
       Datum: isoNaarDatum(r.datum),
       "KM stand": Number(r.km),
