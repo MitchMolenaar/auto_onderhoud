@@ -4,10 +4,11 @@
     "datum": "2023-03-18",
     "km": 68273,
     "types": [
+      "Olie vervangen",
       "Luchtfilter vervangen",
       "Interieurfilter vervangen",
-      "Remschijf check",
-      "Accuvloeistof bijvullen"
+      "Accuvloeistof bijvullen",
+      "Remschijf check"
     ],
     "status": "Ja",
     "info": "Remschijf = 22 mm (ondergrens is 19 mm, nieuw is 23 mm)"
