@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto Onderhoud</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --accent:#3b82f6; --accent2:#22c55e;
+    --text:#e2e8f0; --muted:#94a3b8; --border:#334155; --danger:#ef4444;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    background:var(--bg); color:var(--text); padding:24px 16px 60px;
+  }
+  .wrap{max-width:720px; margin:0 auto;}
+  h1{font-size:1.6rem; margin-bottom:4px;}
+  .sub{color:var(--muted); font-size:.9rem; margin-bottom:20px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:18px; margin-bottom:18px;
+  }
+  .card h2{margin:0 0 12px; font-size:1rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em;}
+  label{display:block; font-size:.85rem; color:var(--muted); margin-bottom:4px; margin-top:12px;}
+  label:first-of-type{margin-top:0;}
+  input, select, textarea{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border);
+    background:#0f172a; color:var(--text); font-size:.95rem;
+  }
+  textarea{resize:vertical; min-height:50px;}
+  .row{display:flex; gap:12px;}
+  .row > div{flex:1;}
+  button{
+    cursor:pointer; border:none; border-radius:8px; padding:10px 16px; font-size:.9rem;
+    font-weight:600;
+  }
+  .btn-primary{background:var(--accent); color:white; margin-top:16px; width:100%; padding:12px;}
+  .btn-primary:disabled{opacity:.5; cursor:not-allowed;}
+  .btn-secondary{background:transparent; border:1px solid var(--border); color:var(--text);}
+  table{width:100%; border-collapse:collapse; font-size:.88rem;}
+  th, td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--border);}
+  th{color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase;}
+  .chip{
+    display:inline-block; padding:2px 8px; border-radius:999px; font-size:.75rem; font-weight:600;
+  }
+  .chip-ja{background:rgba(34,197,94,.15); color:var(--accent2);}
+  .chip-nee{background:rgba(148,163,184,.15); color:var(--muted);}
+  .chip-gepland{background:rgba(59,130,246,.15); color:var(--accent);}
+  .empty{color:var(--muted); text-align:center; padding:20px 0; font-size:.9rem;}
+  .status{font-size:.8rem; margin-top:10px; min-height:1.2em;}
+  .status.ok{color:var(--accent2);}
+  .status.err{color:var(--danger);}
+  .status.busy{color:var(--muted);}
+  details summary{cursor:pointer; color:var(--muted); font-size:.85rem;}
+  .del{background:none; border:none; color:var(--danger); font-size:1.1rem; cursor:pointer; padding:0 6px;}
+  .toggle{display:flex; gap:8px; margin-top:12px;}
+  .toggle button{flex:1; background:#0f172a; border:1px solid var(--border); color:var(--muted);}
+  .toggle button.active{background:var(--accent); color:white; border-color:var(--accent);}
+  .export-row{display:flex; gap:10px; margin-bottom:14px;}
+  .btn-export{
+    flex:1; background:#0f172a; border:1px solid var(--border); color:var(--text);
+    padding:9px 12px; font-size:.85rem; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-export:hover{border-color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚗 Auto Onderhoud</h1>
+  <div class="sub">Bijhouden van km-stand, datum en onderhoud &mdash; opgeslagen in dit GitHub-repo.</div>
+
+  <div class="card">
+    <h2>Nieuw onderhoud</h2>
+    <div class="row">
+      <div>
+        <label>Datum</label>
+        <input type="date" id="f-datum">
+      </div>
+      <div>
+        <label>KM stand</label>
+        <input type="number" id="f-km" placeholder="bv. 45230">
+      </div>
+    </div>
+
+    <label>Onderhoud</label>
+    <select id="f-type">
+      <option>Olie verversen</option>
+      <option>APK keuring</option>
+      <option>Banden wisselen (zomer/winter)</option>
+      <option>Bandenspanning check</option>
+      <option>Remmen (blokken/schijven)</option>
+      <option>Distributieriem</option>
+      <option>Accu</option>
+      <option>Ruitenwissers</option>
+      <option>Airco onderhoud</option>
+      <option>Filters (lucht/brandstof/interieur)</option>
+      <option>Koelvloeistof</option>
+      <option>Grote beurt</option>
+      <option>Kleine beurt</option>
+      <option>Reparatie</option>
+      <option>Anders</option>
+    </select>
+
+    <label>Status</label>
+    <div class="toggle" id="f-status">
+      <button type="button" data-val="Gepland" class="active">Gepland</button>
+      <button type="button" data-val="Ja">Uitgevoerd</button>
+    </div>
+
+    <label>Info / opmerkingen</label>
+    <textarea id="f-info" placeholder="bv. 5W30, garage X, kosten..."></textarea>
+
+    <button class="btn-primary" id="btn-add">+ Toevoegen</button>
+    <div class="status" id="status-add"></div>
+  </div>
+
+  <div class="card">
+    <h2>Overzicht</h2>
+    <div class="export-row">
+      <button class="btn-export" id="btn-export-xlsx">⬇ Excel (.xlsx)</button>
+      <button class="btn-export" id="btn-export-pdf">⬇ PDF</button>
+    </div>
+    <div id="tabel-wrap"><div class="empty">Laden...</div></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>⚙️ Instellingen (GitHub koppeling)</summary>
+      <div style="margin-top:12px;">
+        <label>GitHub gebruikersnaam / organisatie</label>
+        <input id="cfg-owner" placeholder="bv. jouwnaam">
+        <label>Repository naam</label>
+        <input id="cfg-repo" placeholder="bv. auto-onderhoud">
+        <label>Personal Access Token (fine-grained, alleen "Contents: read/write" op deze repo)</label>
+        <input id="cfg-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="btn-secondary" id="btn-save-cfg" style="margin-top:12px; width:100%;">Opslaan &amp; verbinden</button>
+        <div class="status" id="status-cfg"></div>
+        <p style="color:var(--muted); font-size:.78rem; margin-top:10px; line-height:1.4;">
+          De token wordt alleen lokaal in je browser opgeslagen (localStorage), nooit verzonden
+          naar iets anders dan de GitHub API zelf. Maak op github.com/settings/tokens een
+          <em>fine-grained token</em> aan, beperkt tot deze ene repository met alleen
+          "Contents: Read and write" rechten.
+        </p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+const DATA_FILE = "onderhoud.json";
+let sha = null;
+let data = [];
+
+function cfg(){
+  return {
+    owner: localStorage.getItem("gh_owner") || "",
+    repo: localStorage.getItem("gh_repo") || "",
+    token: localStorage.getItem("gh_token") || "",
+  };
+}
+
+function apiUrl(){
+  const c = cfg();
+  return `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${DATA_FILE}`;
+}
+
+function setStatus(el, msg, cls){
+  el.textContent = msg;
+  el.className = "status " + (cls || "");
+}
+
+// ---------- Config laden in velden ----------
+window.addEventListener("DOMContentLoaded", () => {
+  const c = cfg();
+  document.getElementById("cfg-owner").value = c.owner;
+  document.getElementById("cfg-repo").value = c.repo;
+  document.getElementById("cfg-token").value = c.token;
+
+  document.getElementById("f-status").addEventListener("click", (e) => {
+    if(e.target.tagName === "BUTTON"){
+      document.querySelectorAll("#f-status button").forEach(b => b.classList.remove("active"));
+      e.target.classList.add("active");
+    }
+  });
+
+  document.getElementById("btn-save-cfg").addEventListener("click", saveCfg);
+  document.getElementById("btn-add").addEventListener("click", addRow);
+  document.getElementById("btn-export-xlsx").addEventListener("click", exportXlsx);
+  document.getElementById("btn-export-pdf").addEventListener("click", exportPdf);
+
+  if(c.owner && c.repo && c.token){
+    loadData();
+  } else {
+    document.getElementById("tabel-wrap").innerHTML =
+      '<div class="empty">Vul eerst je GitHub-gegevens in bij "Instellingen" hieronder.</div>';
+  }
+});
+
+function saveCfg(){
+  const owner = document.getElementById("cfg-owner").value.trim();
+  const repo = document.getElementById("cfg-repo").value.trim();
+  const token = document.getElementById("cfg-token").value.trim();
+  localStorage.setItem("gh_owner", owner);
+  localStorage.setItem("gh_repo", repo);
+  localStorage.setItem("gh_token", token);
+  const el = document.getElementById("status-cfg");
+  setStatus(el, "Opgeslagen, data laden...", "busy");
+  loadData();
+}
+
+async function ghRequest(method, body){
+  const c = cfg();
+  const res = await fetch(apiUrl(), {
+    method,
+    headers: {
+      "Authorization": `Bearer ${c.token}`,
+      "Accept": "application/vnd.github+json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res;
+}
+
+async function loadData(){
+  const wrap = document.getElementById("tabel-wrap");
+  const statusEl = document.getElementById("status-cfg");
+  try{
+    const res = await ghRequest("GET");
+    if(res.status === 404){
+      // bestand bestaat nog niet: begin leeg
+      data = [];
+      sha = null;
+      renderTable();
+      setStatus(statusEl, "Verbonden. Nog geen data-bestand, wordt aangemaakt bij eerste opslag.", "ok");
+      return;
+    }
+    if(!res.ok){
+      throw new Error(`GitHub API fout (${res.status})`);
+    }
+    const json = await res.json();
+    sha = json.sha;
+    const content = decodeURIComponent(escape(atob(json.content)));
+    data = JSON.parse(content || "[]");
+    renderTable();
+    setStatus(statusEl, "Verbonden en data geladen.", "ok");
+  } catch(err){
+    wrap.innerHTML = '<div class="empty">Kon data niet laden. Controleer je gegevens.</div>';
+    setStatus(statusEl, "Fout: " + err.message, "err");
+  }
+}
+
+async function saveData(commitMsg){
+  const statusEl = document.getElementById("status-add");
+  setStatus(statusEl, "Opslaan naar GitHub...", "busy");
+  try{
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    const body = { message: commitMsg, content, branch: "main" };
+    if(sha) body.sha = sha;
+    const res = await ghRequest("PUT", body);
+    if(!res.ok){
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.message || `GitHub API fout (${res.status})`);
+    }
+    const json = await res.json();
+    sha = json.content.sha;
+    setStatus(statusEl, "Opgeslagen ✓", "ok");
+    setTimeout(() => setStatus(statusEl, "", ""), 2500);
+  } catch(err){
+    setStatus(statusEl, "Opslaan mislukt: " + err.message, "err");
+  }
+}
+
+function addRow(){
+  const datum = document.getElementById("f-datum").value;
+  const km = document.getElementById("f-km").value;
+  const type = document.getElementById("f-type").value;
+  const status = document.querySelector("#f-status button.active").dataset.val;
+  const info = document.getElementById("f-info").value.trim();
+
+  if(!datum || !km){
+    setStatus(document.getElementById("status-add"), "Vul minstens datum en km-stand in.", "err");
+    return;
+  }
+
+  data.unshift({
+    id: Date.now(),
+    datum, km: Number(km), type, status, info,
+  });
+  renderTable();
+  saveData(`Onderhoud toegevoegd: ${type} (${datum})`);
+
+  document.getElementById("f-km").value = "";
+  document.getElementById("f-info").value = "";
+}
+
+function verwijder(id){
+  data = data.filter(r => r.id !== id);
+  renderTable();
+  saveData("Onderhoud verwijderd");
+}
+
+function chipClass(status){
+  if(status === "Ja") return "chip-ja";
+  if(status === "Gepland") return "chip-gepland";
+  return "chip-nee";
+}
+
+function renderTable(){
+  const wrap = document.getElementById("tabel-wrap");
+  if(!data.length){
+    wrap.innerHTML = '<div class="empty">Nog geen onderhoud geregistreerd.</div>';
+    return;
+  }
+  const sorted = [...data].sort((a,b) => (a.datum < b.datum ? 1 : -1));
+  let html = "<table><thead><tr><th>Datum</th><th>KM</th><th>Onderhoud</th><th>Status</th><th>Info</th><th></th></tr></thead><tbody>";
+  for(const r of sorted){
+    html += `<tr>
+      <td>${r.datum}</td>
+      <td>${Number(r.km).toLocaleString("nl-NL")}</td>
+      <td>${r.type}</td>
+      <td><span class="chip ${chipClass(r.status)}">${r.status === "Ja" ? "Uitgevoerd" : r.status}</span></td>
+      <td>${r.info ? r.info : "-"}</td>
+      <td><button class="del" onclick="verwijder(${r.id})" title="Verwijderen">✕</button></td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+}
+
+// ---------- Export ----------
+function exportRows(){
+  return [...data]
+    .sort((a,b) => (a.datum < b.datum ? 1 : -1))
+    .map(r => ({
+      Datum: r.datum,
+      "KM stand": Number(r.km),
+      Onderhoud: r.type,
+      Status: r.status === "Ja" ? "Uitgevoerd" : r.status,
+      Info: r.info || "",
+    }));
+}
+
+function exportXlsx(){
+  if(!data.length){ alert("Nog geen data om te exporteren."); return; }
+  const rows = exportRows();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [{wch:12},{wch:10},{wch:26},{wch:12},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Onderhoud");
+  const datum = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `auto_onderhoud_${datum}.xlsx`);
+}
+
+function exportPdf(){
+  if(!data.length){ alert("Nog geen data om te exporteren."); return; }
+  const rows = exportRows();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(14);
+  doc.text("Auto Onderhoud", 14, 16);
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text(`Geëxporteerd op ${new Date().toLocaleDateString("nl-NL")}`, 14, 22);
+  doc.autoTable({
+    startY: 28,
+    head: [["Datum", "KM stand", "Onderhoud", "Status", "Info"]],
+    body: rows.map(r => [r.Datum, r["KM stand"].toLocaleString("nl-NL"), r.Onderhoud, r.Status, r.Info]),
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [47, 85, 151] },
+    columnStyles: { 4: { cellWidth: 60 } },
+  });
+  const datum = new Date().toISOString().slice(0,10);
+  doc.save(`auto_onderhoud_${datum}.pdf`);
+}
+</script>
+</body>
+</html>
